@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Affine Transform Visualizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <style>
+    /* Custom Scrollbar for a sleek look */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #020617; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    input[type="range"] { accent-color: #38bdf8; }
+    input[type=range] { padding: 0; }
+    /* Pin the two graphs to exactly one screen; the maths section scrolls below them. */
+    @media (min-width: 1024px) {
+      #stage { flex: none; height: calc(100vh - 4.5rem); }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+  
+  <div class="flex flex-col h-[100vh] overflow-y-auto">
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800 bg-slate-900/60 px-6 py-4 flex items-center justify-between backdrop-blur shrink-0">
+      <div class="flex items-center space-x-3">
+        <div class="h-4 w-4 rounded-full bg-indigo-500 ring-4 ring-indigo-500/20"></div>
+        <h1 class="text-lg font-semibold tracking-wide text-slate-100">
+          Affine Transformation <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono ml-2">i = W · s + b</span>
+        </h1>
+      </div>
+      <button id="resetBtn" class="text-xs px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Reset</button>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main id="stage" class="flex-1 flex flex-col lg:flex-row p-4 lg:p-6 gap-6 max-w-[1600px] w-full mx-auto min-h-0">
+      
+      <!-- Graphs Container -->
+      <div class="flex-1 flex flex-col gap-4 min-h-0">
+        
+        <!-- Input Space Canvas -->
+        <div class="flex-1 flex flex-col items-center justify-center bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl relative overflow-hidden min-h-[260px] lg:min-h-0">
+          <div class="absolute top-4 left-4 z-10 text-slate-400 font-bold uppercase tracking-widest text-xs">
+            Input Space (R²) · source
+          </div>
+          
+          <!-- Toggle Legend overlay at Bottom-Left -->
+          <details class="absolute bottom-4 left-4 z-10 bg-slate-950/80 backdrop-blur rounded-xl border border-slate-800 p-3 text-xs font-mono shadow-lg max-h-[80%] overflow-y-auto">
+            <summary class="cursor-pointer select-none text-slate-400 uppercase tracking-widest text-[10px] hover:text-white">Layers &amp; legend</summary>
+            <div class="flex flex-col gap-2 mt-3">
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showGridIn" checked class="accent-emerald-500 w-3 h-3 rounded" />
+              <span class="w-3 h-3 border border-emerald-800/50 grid grid-cols-2 grid-rows-2 gap-[1px] p-[1px] bg-emerald-950">
+                  <span class="bg-emerald-900/50"></span><span class="bg-emerald-900/50"></span>
+                  <span class="bg-emerald-900/50"></span><span class="bg-emerald-900/50"></span>
+              </span>
+              <span class="text-emerald-200/70">Normal Grid</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showUnitIn" checked class="accent-emerald-500 w-3 h-3 rounded" />
+              <span class="w-3 h-3 bg-emerald-500/30 border border-emerald-500/50 inline-block"></span>
+              <span class="text-slate-200">Unit Area</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showRows" checked class="accent-amber-500 w-3 h-3 rounded" />
+              <span class="inline-flex flex-col gap-[2px]"><span class="w-3 h-0.5 bg-amber-400 rounded-full block"></span><span class="w-3 h-0.5 bg-orange-500 rounded-full block"></span></span>
+              <span class="text-slate-200">Row Vectors (r1, r2)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showCovectors" class="accent-amber-500 w-3 h-3 rounded" />
+              <span class="w-3 h-0.5 border-t border-dashed border-amber-400/50 inline-block"></span>
+              <span class="text-slate-200">Row Covectors (Level Sets)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+            <input type="checkbox" id="showInputDotProds" checked class="accent-amber-500 w-3 h-3 rounded" />
+            <span class="inline-flex flex-col gap-[2px]"><span class="w-3 h-0.5 bg-amber-400 rounded-full block"></span><span class="w-3 h-0.5 bg-orange-500 rounded-full block"></span><span class="w-3 h-0.5 bg-fuchsia-400 rounded-full block"></span></span>
+            <span class="text-slate-200">r1·s, r2·s ticks + W·s</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+            <input type="checkbox" id="showBiasIn" checked class="accent-sky-500 w-3 h-3 rounded" />
+            <span class="w-3 h-1 bg-sky-400 rounded-full inline-block"></span>
+            <span class="text-slate-200">Bias Vector (b)</span>
+          </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showInput" checked class="accent-emerald-500 w-3 h-3 rounded" />
+              <span class="w-3 h-1 bg-emerald-400 rounded-full inline-block"></span>
+              <span class="text-slate-200">Source Vector (s)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showHyperplanesIn" class="accent-amber-500 w-3 h-3 rounded" />
+              <span class="inline-flex flex-col gap-[2px]"><span class="w-3 h-0.5 bg-amber-400 block"></span><span class="w-3 h-0.5 bg-orange-500 block"></span></span>
+              <span class="text-slate-200">Solve for target i*</span>
+            </label>
+            </div>
+          </details>
+          <div class="absolute top-4 right-4 z-10 text-[10px] font-mono text-slate-500">drag s or b · drag grid to pan · scroll to zoom</div>
+          <!-- Canvas -->
+          <div class="relative w-full flex-1 min-h-0 flex items-center justify-center">
+            <canvas id="inputCanvas" class="w-full h-full rounded-lg touch-none"></canvas>
+          </div>
+        </div>
+
+        <!-- Output Space Canvas -->
+        <div class="flex-1 flex flex-col items-center justify-center bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl relative overflow-hidden min-h-[260px] lg:min-h-0">
+          <div class="absolute top-4 left-4 z-10 text-slate-400 font-bold uppercase tracking-widest text-xs">
+            <span id="outSpaceLabel">Output Space (R²) · image</span>
+          </div>
+
+          <!-- Toggle Legend overlay at Bottom-Left -->
+          <details class="absolute bottom-4 left-4 z-10 bg-slate-950/80 backdrop-blur rounded-xl border border-slate-800 p-3 text-xs font-mono shadow-lg max-h-[80%] overflow-y-auto">
+            <summary class="cursor-pointer select-none text-slate-400 uppercase tracking-widest text-[10px] hover:text-white">Layers &amp; legend</summary>
+            <div class="flex flex-col gap-2 mt-3">
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showGridOut" checked class="accent-emerald-500 w-3 h-3 rounded" />
+              <span class="w-3 h-3 border border-emerald-800/50 grid grid-cols-2 grid-rows-2 gap-[1px] p-[1px] bg-emerald-950">
+                  <span class="bg-emerald-900/50"></span><span class="bg-emerald-900/50"></span>
+                  <span class="bg-emerald-900/50"></span><span class="bg-emerald-900/50"></span>
+              </span>
+              <span class="text-emerald-200/70">Original Grid (unwarped)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showWarpedGrid" checked class="accent-fuchsia-500 w-3 h-3 rounded" />
+              <span class="w-3 h-3 border border-fuchsia-800/50 grid grid-cols-2 grid-rows-2 gap-[1px] p-[1px] bg-fuchsia-950 transform skew-x-12">
+                  <span class="bg-fuchsia-900/50"></span><span class="bg-fuchsia-900/50"></span>
+                  <span class="bg-fuchsia-900/50"></span><span class="bg-fuchsia-900/50"></span>
+              </span>
+              <span class="text-fuchsia-200/70">Warped Grid</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showWarpedNumbers" checked class="accent-fuchsia-500 w-3 h-3 rounded" />
+              <span class="w-3 h-3 flex items-center justify-center text-[8px] font-bold text-fuchsia-500 bg-fuchsia-950/50 border border-fuchsia-800/50 transform skew-x-12">1</span>
+              <span class="text-fuchsia-200/70">Grid Numbers</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showBias" checked class="accent-sky-500 w-3 h-3 rounded" />
+              <span class="w-3 h-1 bg-sky-400 rounded-full inline-block"></span>
+              <span class="text-slate-200">Bias Vector (b)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showUnitOut" checked class="accent-fuchsia-500 w-3 h-3 rounded" />
+              <span class="w-3 h-3 bg-fuchsia-500/30 border border-fuchsia-500/50 inline-block transform skew-x-12"></span>
+              <span class="text-slate-200">Transformed Area</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showCols" checked class="accent-fuchsia-500 w-3 h-3 rounded" />
+              <span class="w-3 h-1 bg-fuchsia-500 rounded-full inline-block"></span>
+              <span class="text-slate-200">Matrix Cols (c1, c2)</span>
+            </label>
+          <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+            <input type="checkbox" id="showOutput" checked class="accent-purple-500 w-3 h-3 rounded" />
+            <span class="w-3 h-1 bg-purple-400 rounded-full inline-block"></span>
+            <span class="text-slate-200">Image Vector (i)</span>
+          </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showInputInOut" class="accent-emerald-500 w-3 h-3 rounded" />
+              <span class="w-3 h-1 bg-emerald-400/50 rounded-full inline-block"></span>
+              <span class="text-slate-200">Original Source (s)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition-colors">
+              <input type="checkbox" id="showHyperplanesOut" class="accent-amber-500 w-3 h-3 rounded" />
+              <span class="inline-flex flex-col gap-[2px]"><span class="w-3 h-0.5 bg-amber-400 block"></span><span class="w-3 h-0.5 bg-orange-500 block"></span></span>
+              <span class="text-slate-200">Solve for target i*</span>
+            </label>
+            </div>
+          </details>
+          <div class="absolute top-4 right-4 z-10 text-[10px] font-mono text-slate-500">drag grid to pan · scroll to zoom</div>
+          <!-- Canvas -->
+          <div class="relative w-full flex-1 min-h-0 flex items-center justify-center">
+            <canvas id="outputCanvas" class="w-full h-full rounded-lg touch-none"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Controls & Metrics Sidebar -->
+      <aside class="w-full lg:w-64 flex flex-col gap-3 overflow-y-auto">
+        
+        <!-- Parameters -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md space-y-3">
+          
+          <div class="flex justify-between items-center border-b border-slate-800 pb-1 mb-3">
+            <h2 class="text-xs font-semibold tracking-wide text-slate-300">Matrix W</h2>
+            <div class="flex items-center gap-3">
+              <label class="flex items-center space-x-1 cursor-pointer" title="Drop row 2: W becomes 1×2 and maps R² onto a line">
+                <input type="checkbox" id="oneRow" class="accent-indigo-500 w-3 h-3 rounded" />
+                <span class="text-[10px] text-slate-400 font-mono">1 row</span>
+              </label>
+              <label class="flex items-center space-x-1 cursor-pointer">
+                <input type="checkbox" id="fineStepControl" checked class="accent-indigo-500 w-3 h-3 rounded" />
+                <span class="text-[10px] text-slate-400 font-mono">0.1 steps</span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+              <!-- W11 -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">W₁₁</span>
+                  <span id="w11Val" class="text-amber-400">1.0</span>
+                </div>
+                <input id="w11Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="1" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+              <!-- W12 -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">W₁₂</span>
+                  <span id="w12Val" class="text-amber-400">0.0</span>
+                </div>
+                <input id="w12Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+              <!-- W21 -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">W₂₁</span>
+                  <span id="w21Val" class="text-amber-400">0.0</span>
+                </div>
+                <input id="w21Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+              <!-- W22 -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">W₂₂</span>
+                  <span id="w22Val" class="text-amber-400">1.0</span>
+                </div>
+                <input id="w22Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="1" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+            </div>
+
+          <!-- Vector x -->
+          <div>
+            <h2 class="text-xs font-semibold tracking-wide text-slate-300 border-b border-slate-800 pb-1 mb-3">Input Vector x</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <!-- x1 -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">x₁</span>
+                  <span id="x1Val" class="text-emerald-400">2.0</span>
+                </div>
+                <input id="x1Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="2" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+              <!-- x2 -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">x₂</span>
+                  <span id="x2Val" class="text-emerald-400">1.0</span>
+                </div>
+                <input id="x2Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="1" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Bias Vector b -->
+          <div class="mt-4">
+            <h2 class="text-xs font-semibold tracking-wide text-slate-300 border-b border-slate-800 pb-1 mb-3">Bias Vector b (Translation)</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <!-- b1 -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">b₁</span>
+                  <span id="b1Val" class="text-sky-400">0.0</span>
+                </div>
+                <input id="b1Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+              <!-- b2 -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">b₂</span>
+                  <span id="b2Val" class="text-sky-400">0.0</span>
+                </div>
+                <input id="b2Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Target i* -->
+          <div class="mt-4">
+            <h2 class="text-xs font-semibold tracking-wide text-slate-300 border-b border-slate-800 pb-1 mb-3">Target i* (solve W·x + b = i*)</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">i*₁</span>
+                  <span id="t1Val" class="text-slate-200">3.0</span>
+                </div>
+                <input id="t1Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="3" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] font-mono">
+                  <span class="text-slate-400">i*₂</span>
+                  <span id="t2Val" class="text-slate-200">2.0</span>
+                </div>
+                <input id="t2Input" type="range" min="-5" max="5" step="0.5" list="ticks" value="2" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none" />
+              </div>
+            </div>
+            <p class="text-[10px] text-slate-500 leading-snug mt-2">
+              Each hyperplane is every x satisfying one row: <span style="color:#fbbf24">r1·x + b₁ = i*₁</span>,
+              <span style="color:#f97316">r2·x + b₂ = i*₂</span>. They cross at the single x that hits the target. The output space ghosts those same lines on the original grid, then shows the soft band each one lands on after W — the band shrinks to a point when W is singular. The dashed staircase reads i* on the warped grid: its coordinates there are x* itself, since i* = b + x*₁·c1 + x*₂·c2.
+            </p>
+            <div class="mt-2 bg-slate-950/60 p-2 rounded border border-slate-800/60 font-mono text-[11px]">
+              <span id="solText" class="text-slate-200">x* = (3.0, 2.0)</span>
+              <button id="snapBtn" class="ml-2 px-2 py-0.5 rounded border border-slate-700 text-[10px] text-slate-300 hover:bg-slate-800 hover:text-white">set x → x*</button>
+            </div>
+          </div>
+
+          <!-- Zoom -->
+          <div class="space-y-1">
+            <div>
+              <div class="flex justify-between mb-1">
+                <label class="text-slate-400 text-xs uppercase tracking-wider font-semibold">Zoom / Scale</label>
+                <span id="zoomVal" class="text-indigo-400 font-mono text-sm">1.0x</span>
+              </div>
+              <input type="range" id="zoom" min="0.2" max="5.0" step="0.1" value="1" class="w-full accent-indigo-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+            </div>
+            
+            <!-- Eigen Decomposition -->
+            <div class="mt-6 border-t border-slate-700 pt-4">
+              <div class="flex justify-between items-center mb-2">
+                <label for="showEigen" class="text-slate-400 text-xs uppercase tracking-wider font-semibold cursor-pointer">Eigenvectors</label>
+                <input type="checkbox" id="showEigen" class="accent-rose-500 w-4 h-4 rounded cursor-pointer" />
+              </div>
+              <div id="eigenStatus" class="text-xs font-mono text-slate-400 space-y-1">
+                Calculating...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time Geometric Metrics -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md flex-1 space-y-3">
+          <h2 class="text-xs font-semibold tracking-wide text-slate-200 border-b border-slate-800 pb-2">Matrix Multiplication</h2>
+          
+          <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800/60 font-mono text-xs flex justify-center items-center overflow-x-auto">
+            <table class="text-center text-slate-300 mr-2">
+              <tr><td id="m11" class="px-1 border-l-2 border-slate-600">1.0</td><td id="m12" class="px-1 border-r-2 border-slate-600 text-amber-400">0.0</td></tr>
+              <tr id="mRow2"><td id="m21" class="px-1 border-l-2 border-slate-600 text-amber-400">0.0</td><td id="m22" class="px-1 border-r-2 border-slate-600">1.0</td></tr>
+            </table>
+            <span class="mx-1">×</span>
+            <table class="text-center text-emerald-400 mr-2">
+              <tr><td id="vx1" class="px-1 border-l-2 border-r-2 border-emerald-800">2.0</td></tr>
+              <tr><td id="vx2" class="px-1 border-l-2 border-r-2 border-emerald-800">1.0</td></tr>
+            </table>
+            <span class="mx-1">+</span>
+            <table class="text-center text-sky-400 mr-2">
+              <tr><td id="vb1" class="px-1 border-l-2 border-r-2 border-sky-800">0.0</td></tr>
+              <tr id="bRow2"><td id="vb2" class="px-1 border-l-2 border-r-2 border-sky-800">0.0</td></tr>
+            </table>
+            <span class="mx-1">=</span>
+            <table class="text-center text-fuchsia-400">
+              <tr><td id="vy1" class="px-1 border-l-2 border-r-2 border-fuchsia-800 font-bold">2.0</td></tr>
+              <tr id="yRow2"><td id="vy2" class="px-1 border-l-2 border-r-2 border-fuchsia-800 font-bold">1.0</td></tr>
+            </table>
+          </div>
+          
+          <div class="space-y-2">
+            <div class="bg-slate-950/60 p-2 rounded border border-slate-800/60">
+              <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider block mb-1">Row Perspective (Dot Products)</span>
+              <div class="text-[11px] font-mono text-slate-300">
+                i₁ = w_r1 · s + b₁ = <span id="eqR1" class="text-purple-400">2.0</span><span id="eqR2Line"><br>i₂ = w_r2 · s + b₂ = <span id="eqR2" class="text-purple-400">1.0</span></span>
+              </div>
+            </div>
+            
+            <div class="bg-slate-950/60 p-2 rounded border border-slate-800/60">
+              <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider block mb-1">Column Perspective (Linear Combo)</span>
+              <div class="text-[11px] font-mono text-slate-300">
+                i = s₁·w_c1 + s₂·w_c2 + b<br>
+                i = <span id="eqC" class="text-fuchsia-400"> (2.0, 1.0)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Math Calculations Section (Bottom of page) -->
+    <div class="bg-slate-900 border-t border-slate-800 p-8 min-h-[50vh]">
+      <div class="max-w-5xl mx-auto space-y-8">
+        <h2 class="text-2xl font-bold text-slate-100 mb-6">Mathematical Calculations</h2>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div class="bg-slate-950 p-6 rounded-xl border border-slate-800 shadow-xl overflow-x-auto">
+            <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider mb-4">Determinant & Inverse</h3>
+            <div id="math-determinant" class="text-lg"></div>
+          </div>
+          
+          <div class="bg-slate-950 p-6 rounded-xl border border-slate-800 shadow-xl overflow-x-auto">
+            <h3 class="text-sm font-semibold text-rose-400 uppercase tracking-wider mb-4">Eigen-Decomposition</h3>
+            <div id="math-eigen" class="text-lg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <datalist id="ticks">
+    <option value="-5"></option><option value="-4.5"></option><option value="-4"></option>
+    <option value="-3.5"></option><option value="-3"></option><option value="-2.5"></option>
+    <option value="-2"></option><option value="-1.5"></option><option value="-1"></option>
+    <option value="-0.5"></option><option value="0"></option><option value="0.5"></option>
+    <option value="1"></option><option value="1.5"></option><option value="2"></option>
+    <option value="2.5"></option><option value="3"></option><option value="3.5"></option>
+    <option value="4"></option><option value="4.5"></option><option value="5"></option>
+  </datalist>
+
+  <script>
+    const canvasIn = document.getElementById('inputCanvas');
+    const ctxIn = canvasIn.getContext('2d');
+    const canvasOut = document.getElementById('outputCanvas');
+    const ctxOut = canvasOut.getContext('2d');
+
+    // DOM Elements - Inputs
+    const fineStepControl = document.getElementById('fineStepControl');
+    const oneRow = document.getElementById('oneRow');
+    const w11Input = document.getElementById('w11Input');
+    const w12Input = document.getElementById('w12Input');
+    const w21Input = document.getElementById('w21Input');
+    const w22Input = document.getElementById('w22Input');
+    const x1Input = document.getElementById('x1Input');
+    const x2Input = document.getElementById('x2Input');
+    const b1Input = document.getElementById('b1Input');
+    const b2Input = document.getElementById('b2Input');
+    const zoomInput = document.getElementById('zoom');
+    const t1Input = document.getElementById('t1Input');
+    const t2Input = document.getElementById('t2Input');
+    const t1Val = document.getElementById('t1Val');
+    const t2Val = document.getElementById('t2Val');
+    const solText = document.getElementById('solText');
+    const paramInputs = [w11Input, w12Input, w21Input, w22Input, x1Input, x2Input, b1Input, b2Input, t1Input, t2Input];
+
+    // Toggles
+    const showRows = document.getElementById('showRows');
+    const showCols = document.getElementById('showCols');
+    const showCovectors = document.getElementById('showCovectors');
+    const showInput = document.getElementById('showInput');
+    const showInputDotProds = document.getElementById('showInputDotProds');
+    const showOutput = document.getElementById('showOutput');
+    const showWarpedGrid = document.getElementById('showWarpedGrid');
+    const showWarpedNumbers = document.getElementById('showWarpedNumbers');
+    const showBias = document.getElementById('showBias');
+    const showInputInOut = document.getElementById('showInputInOut');
+    const showGridIn = document.getElementById('showGridIn');
+    const showGridOut = document.getElementById('showGridOut');
+    const showUnitIn = document.getElementById('showUnitIn');
+    const showUnitOut = document.getElementById('showUnitOut');
+    const showEigen = document.getElementById('showEigen');
+    const eigenStatus = document.getElementById('eigenStatus');
+    const showHyperplanesIn = document.getElementById('showHyperplanesIn');
+    const showHyperplanesOut = document.getElementById('showHyperplanesOut');
+    const showBiasIn = document.getElementById('showBiasIn');
+
+    // Display
+    const w11Val = document.getElementById('w11Val');
+    const w12Val = document.getElementById('w12Val');
+    const w21Val = document.getElementById('w21Val');
+    const w22Val = document.getElementById('w22Val');
+    const x1Val = document.getElementById('x1Val');
+    const x2Val = document.getElementById('x2Val');
+    const b1Val = document.getElementById('b1Val');
+    const b2Val = document.getElementById('b2Val');
+    const zoomVal = document.getElementById('zoomVal');
+
+    // Matrix Elements
+    const m11 = document.getElementById('m11');
+    const m12 = document.getElementById('m12');
+    const m21 = document.getElementById('m21');
+    const m22 = document.getElementById('m22');
+    const vx1 = document.getElementById('vx1');
+    const vx2 = document.getElementById('vx2');
+    const vb1 = document.getElementById('vb1');
+    const vb2 = document.getElementById('vb2');
+    const vy1 = document.getElementById('vy1');
+    const vy2 = document.getElementById('vy2');
+    
+    // Equations
+    const eqR1 = document.getElementById('eqR1');
+    const eqR2 = document.getElementById('eqR2');
+    const eqC = document.getElementById('eqC');
+
+    // Row 1 / row 2 are two shades of the same orange so they read as one family;
+    // each row's solution hyperplane and level sets reuse its exact shade.
+    const R1 = "#fbbf24";        // amber-400
+    const R2 = "#f97316";        // orange-500
+    const BIAS = "#38bdf8";      // sky-400
+    const TARGET = "#e2e8f0";    // slate-200
+
+    // Coordinate system configuration
+    // Sliders top out at ±5, so ±6 frames the whole reachable space with a little margin.
+    const BASE_WORLD_EXTENT = 6.0;
+    let currentWorldExtent = 6.0;
+    // View centre, shared by both canvases so they always pan together.
+    let panX = 0, panY = 0;
+
+    function resizeCanvas() {
+      const resize = (canvas) => {
+          const rect = canvas.parentElement.getBoundingClientRect();
+          const dpr = window.devicePixelRatio || 1;
+          
+          canvas.width = rect.width * dpr;
+          canvas.height = rect.height * dpr;
+          canvas.style.width = rect.width + 'px';
+          canvas.style.height = rect.height + 'px';
+      }
+      resize(canvasIn);
+      resize(canvasOut);
+      render();
+    }
+    window.addEventListener('resize', resizeCanvas);
+    new ResizeObserver(() => resizeCanvas()).observe(canvasIn.parentElement);
+
+    // Solving is one idea spanning both spaces, so the two legend toggles mirror each other.
+    [showHyperplanesIn, showHyperplanesOut].forEach((box, i, both) => {
+      box.addEventListener('change', () => {
+        both[1 - i].checked = box.checked;
+        render();
+      });
+    });
+
+    [...paramInputs, zoomInput].forEach(input => {
+        input.addEventListener('input', render);
+    });
+    
+    [showGridIn, showUnitIn, showRows, showCovectors, showInputDotProds, showInput, 
+     showGridOut, showWarpedGrid, showWarpedNumbers, showBias, showUnitOut, showCols, showOutput, showInputInOut, showEigen, showHyperplanesIn, showHyperplanesOut, showBiasIn].forEach(checkbox => {
+        checkbox.addEventListener('change', render);
+    });
+
+    // 1-row mode: W is 1×2, so row 2 (and the second component of b and i*) is pinned to 0.
+    // render() re-reads the flag, so dragging b or hitting Reset cannot resurrect row 2.
+    let row2Memo = null;
+    function applyRowMode() {
+      const on = oneRow.checked;
+      const row2 = [w21Input, w22Input, b2Input, t2Input];
+      // Remember row 2 so switching back restores the matrix you had.
+      if (on && !row2Memo) row2Memo = row2.map(i => i.value);
+      if (!on && row2Memo) { row2.forEach((i, k) => i.value = row2Memo[k]); row2Memo = null; }
+      row2.forEach(input => {
+        if (on) input.value = 0;
+        input.disabled = on;
+        input.closest('.space-y-1').classList.toggle('opacity-30', on);
+      });
+      document.getElementById('outSpaceLabel').textContent =
+        on ? 'Output Space (R¹) · image' : 'Output Space (R²) · image';
+      ['mRow2', 'bRow2', 'yRow2', 'eqR2Line'].forEach(id => { document.getElementById(id).hidden = on; });
+      // The solution set is the line itself, so show it; and both warped axes now
+      // collapse onto that same line, so their numbers would just overprint.
+      if (on) { showHyperplanesIn.checked = showHyperplanesOut.checked = true; showWarpedNumbers.checked = false; }
+      render();
+    }
+    oneRow.addEventListener('change', applyRowMode);
+
+    // Apply the checkbox's initial state (0.1) to every parameter slider at start-up.
+    window.addEventListener('DOMContentLoaded', () => fineStepControl.dispatchEvent(new Event('change')));
+    fineStepControl.addEventListener('change', (e) => {
+        const isFine = e.target.checked;
+        paramInputs.forEach(input => {
+            input.step = isFine ? "0.1" : "0.5";
+            if (isFine) {
+                input.removeAttribute('list');
+            } else {
+                input.setAttribute('list', 'ticks');
+            }
+        });
+    });
+
+    function worldToScreen(wx, wy, width, height) {
+      const minDimension = Math.min(width, height);
+      const scale = minDimension / (2 * currentWorldExtent);
+      return {
+        x: (width / 2) + (wx - panX) * scale,
+        y: (height / 2) - (wy - panY) * scale
+      };
+    }
+
+    function screenToWorld(px, py, width, height) {
+      const scale = Math.min(width, height) / (2 * currentWorldExtent);
+      return { x: (px - width / 2) / scale + panX, y: (height / 2 - py) / scale + panY };
+    }
+
+    // Input canvas: drag the source / bias vector. Either canvas: drag empty space to pan
+    // both views together (panX/panY are shared).
+    let drag = null;
+    const handles = () => [
+      showInput.checked ? { a: x1Input, b: x2Input } : null,
+      showBiasIn.checked ? { a: b1Input, b: b2Input } : null
+    ].filter(Boolean);
+
+    function worldAt(canvas, e) {
+      const r = canvas.getBoundingClientRect();
+      return screenToWorld(e.clientX - r.left, e.clientY - r.top, r.width, r.height);
+    }
+
+    function snap(v, input) {
+      const step = parseFloat(input.step) || 0.1;
+      return Math.min(parseFloat(input.max), Math.max(parseFloat(input.min), Math.round(v / step) * step));
+    }
+
+    [canvasIn, canvasOut].forEach(canvas => {
+      // Only the input canvas carries draggable vectors.
+      const handleHit = (w) => canvas !== canvasIn ? null
+        : handles().find(h => Math.hypot(w.x - h.a.value, w.y - h.b.value) < currentWorldExtent * 0.09);
+
+      canvas.addEventListener('pointerdown', (e) => {
+        const hit = handleHit(worldAt(canvas, e));
+        const r = canvas.getBoundingClientRect();
+        drag = hit
+          ? { canvas, hit }
+          : { canvas, px: e.clientX, py: e.clientY, panX, panY,
+              scale: Math.min(r.width, r.height) / (2 * currentWorldExtent) };
+        canvas.setPointerCapture(e.pointerId);
+        canvas.style.cursor = hit ? 'grabbing' : 'grabbing';
+      });
+
+      canvas.addEventListener('pointermove', (e) => {
+        if (!drag) {
+          canvas.style.cursor = handleHit(worldAt(canvas, e)) ? 'grab' : 'move';
+          return;
+        }
+        if (drag.canvas !== canvas) return;
+        if (drag.hit) {
+          const w = worldAt(canvas, e);
+          drag.hit.a.value = snap(w.x, drag.hit.a);
+          drag.hit.b.value = snap(w.y, drag.hit.b);
+        } else {
+          panX = drag.panX - (e.clientX - drag.px) / drag.scale;
+          panY = drag.panY + (e.clientY - drag.py) / drag.scale;
+        }
+        render();
+      });
+
+      const endDrag = () => { drag = null; canvas.style.cursor = 'move'; };
+      canvas.addEventListener('pointerup', endDrag);
+      canvas.addEventListener('pointercancel', endDrag);
+    });
+
+    // Wheel zooms both spaces together.
+    [canvasIn, canvasOut].forEach(c => c.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const next = parseFloat(zoomInput.value) * (e.deltaY < 0 ? 1.1 : 1 / 1.1);
+      zoomInput.value = Math.min(parseFloat(zoomInput.max), Math.max(parseFloat(zoomInput.min), next));
+      render();
+    }, { passive: false }));
+
+    document.getElementById('snapBtn').addEventListener('click', () => {
+      const d = parseFloat(w11Input.value) * parseFloat(w22Input.value) - parseFloat(w12Input.value) * parseFloat(w21Input.value);
+      if (Math.abs(d) < 1e-9) return;
+      const r1v = parseFloat(t1Input.value) - parseFloat(b1Input.value);
+      const r2v = parseFloat(t2Input.value) - parseFloat(b2Input.value);
+      x1Input.value = snap(( parseFloat(w22Input.value) * r1v - parseFloat(w12Input.value) * r2v) / d, x1Input);
+      x2Input.value = snap((-parseFloat(w21Input.value) * r1v + parseFloat(w11Input.value) * r2v) / d, x2Input);
+      render();
+    });
+
+    const DEFAULTS = { w11Input: 1, w12Input: 0, w21Input: 0, w22Input: 1, x1Input: 2, x2Input: 1, b1Input: 0, b2Input: 0, t1Input: 3, t2Input: 2, zoom: 1 };
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      for (const [id, v] of Object.entries(DEFAULTS)) document.getElementById(id).value = v;
+      panX = panY = 0;
+      row2Memo = null;   // reset wipes the stashed row 2 too
+      render();
+    });
+
+    function drawLineEquation(ctx, A, B, C, color, width, height) {
+        if (Math.abs(A) < 1e-6 && Math.abs(B) < 1e-6) return;
+        const minDimension = Math.min(width, height);
+        const scale = minDimension / (2 * currentWorldExtent);
+        const maxDist = Math.max(width/2, height/2) / scale + Math.hypot(panX, panY);
+        
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        
+        ctx.beginPath();
+        if (Math.abs(A) > Math.abs(B)) {
+            const y1_pt = -maxDist * 2, y2_pt = maxDist * 2;
+            const x1_pt = (C - B * y1_pt) / A;
+            const x2_pt = (C - B * y2_pt) / A;
+            const p1 = worldToScreen(x1_pt, y1_pt, width, height);
+            const p2 = worldToScreen(x2_pt, y2_pt, width, height);
+            ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+        } else {
+            const x1_pt = -maxDist * 2, x2_pt = maxDist * 2;
+            const y1_pt = (C - A * x1_pt) / B;
+            const y2_pt = (C - A * x2_pt) / B;
+            const p1 = worldToScreen(x1_pt, y1_pt, width, height);
+            const p2 = worldToScreen(x2_pt, y2_pt, width, height);
+            ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawArrow(ctx, fromX, fromY, toX, toY, color, width = 2, headLen = 10, offset = false) {
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+      const length = Math.sqrt(dx*dx + dy*dy);
+      if (length < 0.01) return;
+      
+      let fx = fromX, fy = fromY, tx = toX, ty = toY;
+      
+      if (offset) {
+          const nx = -dy / length;
+          const ny = dx / length;
+          fx += nx * 2; fy += ny * 2;
+          tx += nx * 2; ty += ny * 2;
+      }
+      
+      const angle = Math.atan2(ty - fy, tx - fx);
+      
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx - headLen * Math.cos(angle - Math.PI / 7), ty - headLen * Math.sin(angle - Math.PI / 7));
+      ctx.lineTo(tx - headLen * Math.cos(angle + Math.PI / 7), ty - headLen * Math.sin(angle + Math.PI / 7));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawCovectorSets(ctx, wx, wy, color, width, height) {
+        const magSq = wx*wx + wy*wy;
+        if (magSq < 0.01) return;
+        
+        if (wx === 0 && wy === 0) return;
+        const minDimension = Math.min(width, height);
+        const scale = minDimension / (2 * currentWorldExtent);
+        
+        const wMag2 = wx*wx + wy*wy;
+        const stepX = wx / wMag2;
+        const stepY = wy / wMag2;
+        
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        
+        const maxDist = Math.max(width/2, height/2) / scale + Math.hypot(panX, panY);
+        const wMag = Math.sqrt(wMag2);
+        const maxC = Math.ceil(maxDist * wMag * 2);
+
+        const screenDist = scale / wMag;
+        let textStep = 1;
+        if (screenDist < 20) {
+            const idealStep = 20 / screenDist;
+            if (idealStep <= 2) textStep = 2;
+            else if (idealStep <= 5) textStep = 5;
+            else if (idealStep <= 10) textStep = 10;
+            else textStep = Math.ceil(idealStep / 10) * 10;
+        }
+
+        for (let c = -maxC; c <= maxC; c++) {
+            ctx.setLineDash(c === 0 ? [] : [4, 6]);
+            ctx.globalAlpha = c === 0 ? 0.4 : 0.15;
+            
+            ctx.beginPath();
+            if (Math.abs(wx) > Math.abs(wy)) {
+                // More horizontal line: y varies more
+                const y1 = -maxDist * 2, y2 = maxDist * 2;
+                const x1 = (c - y1*wy)/wx;
+                const x2 = (c - y2*wy)/wx;
+                const p1 = worldToScreen(x1, y1, width, height);
+                const p2 = worldToScreen(x2, y2, width, height);
+                ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+            } else {
+                const x1 = -maxDist * 2, x2 = maxDist * 2;
+                const y1 = (c - x1*wx)/wy;
+                const y2 = (c - x2*wx)/wy;
+                const p1 = worldToScreen(x1, y1, width, height);
+                const p2 = worldToScreen(x2, y2, width, height);
+                ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+            }
+            ctx.stroke();
+
+            if (c !== 0 && c % textStep === 0) {
+                const intersectX = c * stepX;
+                const intersectY = c * stepY;
+                const pInter = worldToScreen(intersectX, intersectY, width, height);
+                
+                ctx.save();
+                ctx.globalAlpha = 0.9;
+                ctx.fillStyle = color;
+                ctx.font = "10px monospace";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                
+                ctx.strokeStyle = "#020617";
+                ctx.lineWidth = 3;
+                ctx.strokeText(c, pInter.x + 8, pInter.y - 8);
+                ctx.fillText(c, pInter.x + 8, pInter.y - 8);
+                ctx.restore();
+            }
+        }
+        ctx.restore();
+    }
+
+    function drawGrid(ctx, width, height, theme = 'slate') {
+      const minDimension = Math.min(width, height);
+      const scale = minDimension / (2 * currentWorldExtent);
+      
+      const maxX = (width / 2) / scale;
+      const maxY = (height / 2) / scale;
+
+      // Grid bounds track the panned view instead of sitting fixed around (0,0).
+      const gx0 = Math.floor(panX - maxX), gx1 = Math.ceil(panX + maxX);
+      const gy0 = Math.floor(panY - maxY), gy1 = Math.ceil(panY + maxY);
+      
+      let axisColor, lineColor, textColor;
+      if (theme === 'green') {
+          axisColor = "rgba(16, 185, 129, 0.5)"; // emerald-500
+          lineColor = "rgba(16, 185, 129, 0.1)"; // faint emerald
+          textColor = "#059669";
+      } else {
+          axisColor = "#475569";
+          lineColor = "#1e293b";
+          textColor = "#64748b";
+      }
+
+      ctx.lineWidth = 1;
+      ctx.font = "10px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // Vertical lines
+      for (let i = gx0; i <= gx1; i++) {
+        const p1 = worldToScreen(i, gy0, width, height);
+        const p2 = worldToScreen(i, gy1, width, height);
+        ctx.strokeStyle = (i === 0) ? axisColor : lineColor;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      }
+
+      // Horizontal lines
+      for (let i = gy0; i <= gy1; i++) {
+        const p1 = worldToScreen(gx0, i, width, height);
+        const p2 = worldToScreen(gx1, i, width, height);
+        ctx.strokeStyle = (i === 0) ? axisColor : lineColor;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      }
+
+      // Ticks
+      ctx.fillStyle = textColor;
+      for (let i = gx0; i <= gx1; i++) {
+        if (i === 0) continue;
+        const tickX = worldToScreen(i, 0, width, height);
+        ctx.fillText(i, tickX.x, tickX.y + 12);
+      }
+      for (let i = gy0; i <= gy1; i++) {
+        if (i === 0) continue;
+        const tickY = worldToScreen(0, i, width, height);
+        ctx.fillText(i, tickY.x - 12, tickY.y);
+      }
+    }
+
+    // A dot product is a coordinate, not a direction — mark it on its axis.
+    function drawAxisTick(ctx, width, height, value, axis, color, label) {
+        const p = axis === 'x' ? worldToScreen(value, 0, width, height)
+                               : worldToScreen(0, value, width, height);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (axis === 'x') { ctx.moveTo(p.x, p.y - 8); ctx.lineTo(p.x, p.y + 8); }
+        else              { ctx.moveTo(p.x - 8, p.y); ctx.lineTo(p.x + 8, p.y); }
+        ctx.stroke();
+        ctx.font = "bold 11px monospace";
+        drawLabel(ctx, width, height, label, p, color, axis === 'x' ? 0 : 38, axis === 'x' ? -14 : -12);
+        ctx.restore();
+    }
+
+    // Ring + crosshair + centre dot, and an arrow from the origin so it reads as a vector.
+    function drawPoint(ctx, width, height, origin, wx, wy, color, label, withArrow = true) {
+        const p = worldToScreen(wx, wy, width, height);
+        if (withArrow) drawArrow(ctx, origin.x, origin.y, p.x, p.y, color, 2, 11, false);
+        ctx.save();
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p.x - 11, p.y); ctx.lineTo(p.x - 7, p.y);
+        ctx.moveTo(p.x + 7, p.y);  ctx.lineTo(p.x + 11, p.y);
+        ctx.moveTo(p.x, p.y - 11); ctx.lineTo(p.x, p.y - 7);
+        ctx.moveTo(p.x, p.y + 7);  ctx.lineTo(p.x, p.y + 11);
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+        ctx.font = "bold 11px monospace";
+        drawLabel(ctx, width, height, label, p, color, 0, -16);
+        ctx.restore();
+    }
+
+    function drawLabel(ctx, width, height, text, screenPos, color, offsetX, offsetY) {
+        ctx.fillStyle = color;
+        ctx.strokeStyle = "#020617";
+        ctx.lineWidth = 3;
+        let ax = screenPos.x + offsetX;
+        let ay = screenPos.y + offsetY;
+        ctx.textAlign = "center";
+        if (ax < 20) { ctx.textAlign = "left"; ax = screenPos.x + 10; }
+        if (ax > width - 20) { ctx.textAlign = "right"; ax = screenPos.x - 10; }
+        ctx.strokeText(text, ax, ay);
+        ctx.fillText(text, ax, ay);
+    }
+
+    function render() {
+      const w11 = parseFloat(w11Input.value);
+      const w12 = parseFloat(w12Input.value);
+      const single = oneRow.checked;
+      const w21 = single ? 0 : parseFloat(w21Input.value);
+      const w22 = single ? 0 : parseFloat(w22Input.value);
+      const x1 = parseFloat(x1Input.value);
+      const x2 = parseFloat(x2Input.value);
+      const b1 = parseFloat(b1Input.value);
+      const b2 = single ? 0 : parseFloat(b2Input.value);
+      const t1 = parseFloat(t1Input.value);
+      const t2 = single ? 0 : parseFloat(t2Input.value);
+      const zoom = parseFloat(zoomInput.value);
+
+      // x* = W⁻¹(i* − b): the unique input that lands on the target, when W is invertible.
+      const detW = w11 * w22 - w12 * w21;
+      const rhs1 = t1 - b1, rhs2 = t2 - b2;
+      const solution = Math.abs(detW) > 1e-9
+        ? { x: ( w22 * rhs1 - w12 * rhs2) / detW, y: (-w21 * rhs1 + w11 * rhs2) / detW }
+        : null;
+
+      currentWorldExtent = BASE_WORLD_EXTENT / zoom;
+
+      // Update UI Labels
+      w11Val.textContent = w11.toFixed(1);
+      w12Val.textContent = w12.toFixed(1);
+      w21Val.textContent = w21.toFixed(1);
+      w22Val.textContent = w22.toFixed(1);
+      x1Val.textContent = x1.toFixed(1);
+      x2Val.textContent = x2.toFixed(1);
+      b1Val.textContent = b1.toFixed(1);
+      b2Val.textContent = b2.toFixed(1);
+      zoomVal.textContent = zoom.toFixed(1) + 'x';
+      t1Val.textContent = t1.toFixed(1);
+      t2Val.textContent = t2.toFixed(1);
+      solText.textContent = solution
+        ? `x* = (${solution.x.toFixed(2)}, ${solution.y.toFixed(2)})`
+        : single ? '1 equation, 2 unknowns → a whole line of x*'
+                 : 'det W = 0 — no unique x*';
+      solText.className = solution ? 'text-slate-200' : 'text-rose-400';
+
+      // Math
+      const y1 = w11 * x1 + w12 * x2 + b1;
+      const y2 = w21 * x1 + w22 * x2 + b2;
+
+      // Update Matrix UI
+      m11.textContent = w11.toFixed(1);
+      m12.textContent = w12.toFixed(1);
+      m21.textContent = w21.toFixed(1);
+      m22.textContent = w22.toFixed(1);
+      vx1.textContent = x1.toFixed(1);
+      vx2.textContent = x2.toFixed(1);
+      vb1.textContent = b1.toFixed(1);
+      vb2.textContent = b2.toFixed(1);
+      vy1.textContent = y1.toFixed(1);
+      vy2.textContent = y2.toFixed(1);
+      
+      eqR1.textContent = y1.toFixed(1);
+      eqR2.textContent = y2.toFixed(1);
+      eqC.textContent = `(${y1.toFixed(1)}, ${y2.toFixed(1)})`;
+
+      const dpr = window.devicePixelRatio || 1;
+      
+      // Setup Input Canvas
+      const widthIn = canvasIn.width / dpr;
+      const heightIn = canvasIn.height / dpr;
+      ctxIn.save(); ctxIn.scale(dpr, dpr); ctxIn.clearRect(0, 0, widthIn, heightIn);
+      if (showGridIn.checked) drawGrid(ctxIn, widthIn, heightIn, 'green');
+      
+      // Setup Output Canvas
+      const widthOut = canvasOut.width / dpr;
+      const heightOut = canvasOut.height / dpr;
+      ctxOut.save(); ctxOut.scale(dpr, dpr); ctxOut.clearRect(0, 0, widthOut, heightOut);
+      if (showGridOut.checked) drawGrid(ctxOut, widthOut, heightOut, 'green');
+
+      const originIn = worldToScreen(0, 0, widthIn, heightIn);
+      const originOut = worldToScreen(0, 0, widthOut, heightOut);
+      
+      // Screen Space Vectors
+      const sw_r1 = worldToScreen(w11, w12, widthIn, heightIn);
+      const sw_r2 = worldToScreen(w21, w22, widthIn, heightIn);
+      const sx = worldToScreen(x1, x2, widthIn, heightIn);
+
+      const sw_c1 = worldToScreen(w11, w21, widthOut, heightOut);
+      const sw_c2 = worldToScreen(w12, w22, widthOut, heightOut);
+      const sy = worldToScreen(y1, y2, widthOut, heightOut);
+      const sy_x = worldToScreen(y1, 0, widthOut, heightOut);
+      const sy_y = worldToScreen(0, y2, widthOut, heightOut);
+
+      // --- Draw on Input Canvas ---
+      if (showUnitIn.checked) {
+          const p0 = worldToScreen(0, 0, widthIn, heightIn);
+          const px = worldToScreen(1, 0, widthIn, heightIn);
+          const pxy = worldToScreen(1, 1, widthIn, heightIn);
+          const py = worldToScreen(0, 1, widthIn, heightIn);
+          ctxIn.fillStyle = "rgba(16, 185, 129, 0.15)";
+          ctxIn.strokeStyle = "rgba(16, 185, 129, 0.4)";
+          ctxIn.lineWidth = 1;
+          ctxIn.beginPath();
+          ctxIn.moveTo(p0.x, p0.y); ctxIn.lineTo(px.x, px.y);
+          ctxIn.lineTo(pxy.x, pxy.y); ctxIn.lineTo(py.x, py.y);
+          ctxIn.closePath();
+          ctxIn.fill(); ctxIn.stroke();
+      }
+
+      if (showCovectors.checked) {
+          drawCovectorSets(ctxIn, w11, w12, R1, widthIn, heightIn); 
+          drawCovectorSets(ctxIn, w21, w22, R2, widthIn, heightIn); 
+      }
+      if (showRows.checked) {
+          drawArrow(ctxIn, originIn.x, originIn.y, sw_r1.x, sw_r1.y, R1, 2.5, 12, false);
+          drawArrow(ctxIn, originIn.x, originIn.y, sw_r2.x, sw_r2.y, R2, 2.5, 12, true);
+      }
+      if (showInputDotProds.checked) {
+          const dp1 = w11 * x1 + w12 * x2;
+          const dp2 = w21 * x1 + w22 * x2;
+          
+          drawAxisTick(ctxIn, widthIn, heightIn, dp1, 'x', R1, `r1·s=${dp1.toFixed(1)}`);
+          if (!single) drawAxisTick(ctxIn, widthIn, heightIn, dp2, 'y', R2, `r2·s=${dp2.toFixed(1)}`);
+
+          // The two dot products read together are one vector: W·s, the image before b.
+          const sWs = worldToScreen(dp1, dp2, widthIn, heightIn);
+          drawArrow(ctxIn, originIn.x, originIn.y, sWs.x, sWs.y, "#e879f9", 2.5, 13, false);
+          ctxIn.font = "bold 11px monospace";
+          drawLabel(ctxIn, widthIn, heightIn, "W·s", sWs, "#e879f9", 0, -14);
+      }
+      if (showBiasIn && showBiasIn.checked) {
+          const sbIn = worldToScreen(b1, b2, widthIn, heightIn);
+          drawArrow(ctxIn, originIn.x, originIn.y, sbIn.x, sbIn.y, BIAS, 3, 14, false);
+      }
+      if (showInput.checked) {
+          drawArrow(ctxIn, originIn.x, originIn.y, sx.x, sx.y, "#34d399", 3, 14, false);
+      }
+      
+      if (showHyperplanesIn.checked) {
+          // Every x whose k-th output equals the k-th target component.
+          drawLineEquation(ctxIn, w11, w12, t1 - b1, R1, widthIn, heightIn);
+          drawLineEquation(ctxIn, w21, w22, t2 - b2, R2, widthIn, heightIn);
+          // The target's own coordinates, ghosted into the input plane for comparison —
+          // i* lives in the output space, so it is drawn faded and without an arrow.
+          ctxIn.save();
+          ctxIn.globalAlpha = 0.4;
+          drawPoint(ctxIn, widthIn, heightIn, originIn, t1, t2, TARGET, "i*", false);
+          ctxIn.restore();
+
+          if (solution) drawPoint(ctxIn, widthIn, heightIn, originIn, solution.x, solution.y, TARGET, "x*", false);
+      }
+
+      // Eigensystem processing
+      const eigen = single ? null : getEigenSystem(w11, w12, w21, w22);
+      if (eigen) {
+          eigenStatus.innerHTML = `
+            <div class="text-rose-400 flex justify-between"><span>λ₁ = ${eigen.l1.toFixed(2)}</span> <span class="text-slate-500">v₁=[${eigen.v1.x.toFixed(2)}, ${eigen.v1.y.toFixed(2)}]</span></div>
+            <div class="text-rose-400 flex justify-between"><span>λ₂ = ${eigen.l2.toFixed(2)}</span> <span class="text-slate-500">v₂=[${eigen.v2.x.toFixed(2)}, ${eigen.v2.y.toFixed(2)}]</span></div>
+          `;
+          showEigen.disabled = false;
+          showEigen.classList.remove('opacity-50', 'cursor-not-allowed');
+      } else {
+          eigenStatus.innerHTML = `<div class="text-slate-500">${single ? 'n/a — W is 1×2' : 'Complex (Rotational)'}</div>`;
+          showEigen.disabled = true;
+          showEigen.checked = false;
+          showEigen.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+
+      const minDimensionIn = Math.min(widthIn, heightIn);
+      const scaleIn = minDimensionIn / (2 * currentWorldExtent);
+      const minDimensionOut = Math.min(widthOut, heightOut);
+      const scaleOut = minDimensionOut / (2 * currentWorldExtent);
+
+      if (eigen && showEigen.checked) {
+          // Input Space: Draw normalized eigenvectors and their spans
+          drawEigenspace(ctxIn, eigen.v1.x, eigen.v1.y, "#f43f5e", widthIn, heightIn, scaleIn);
+          const sv1In = worldToScreen(eigen.v1.x, eigen.v1.y, widthIn, heightIn);
+          drawArrow(ctxIn, originIn.x, originIn.y, sv1In.x, sv1In.y, "#f43f5e", 2, 10, false);
+          ctxIn.fillStyle = "#f43f5e"; ctxIn.fillText("v₁", sv1In.x + 10, sv1In.y);
+
+          drawEigenspace(ctxIn, eigen.v2.x, eigen.v2.y, "#f43f5e", widthIn, heightIn, scaleIn);
+          const sv2In = worldToScreen(eigen.v2.x, eigen.v2.y, widthIn, heightIn);
+          drawArrow(ctxIn, originIn.x, originIn.y, sv2In.x, sv2In.y, "#f43f5e", 2, 10, false);
+          ctxIn.fillStyle = "#f43f5e"; ctxIn.fillText("v₂", sv2In.x + 10, sv2In.y);
+      }
+
+      ctxIn.font = "bold 11px monospace";
+      if (showBiasIn && showBiasIn.checked) {
+          const sbIn = worldToScreen(b1, b2, widthIn, heightIn);
+          drawLabel(ctxIn, widthIn, heightIn, "b", sbIn, BIAS, 0, -15);
+      }
+      if (showRows.checked) {
+          drawLabel(ctxIn, widthIn, heightIn, "r1", sw_r1, R1, 15, -15);
+          if (!single) drawLabel(ctxIn, widthIn, heightIn, "r2", sw_r2, R2, -15, -15);
+      }
+      if (showInput.checked) {
+          drawLabel(ctxIn, widthIn, heightIn, "s", sx, "#34d399", 0, -15);
+      }
+
+      function drawWarpedGrid(ctx, w11, w12, w21, w22, bx, by, width, height, drawLines, drawNumbers) {
+        ctx.save();
+        ctx.lineWidth = 1;
+        
+        const minDimension = Math.min(width, height);
+        const scale = minDimension / (2 * currentWorldExtent);
+        const maxDist = Math.max(width/2, height/2) / scale + Math.hypot(panX, panY);
+        const maxGrid = Math.ceil(maxDist * 3); 
+        
+        const axisColor = "rgba(217, 70, 239, 0.5)"; // fuchsia-500
+        const lineColor = "rgba(217, 70, 239, 0.15)";
+        
+        for (let i = -maxGrid; i <= maxGrid; i++) {
+          if (drawLines) {
+              // Lines parallel to column 2 (moving along column 1)
+              const p1 = worldToScreen(i * w11 - maxGrid * w12 + bx, i * w21 - maxGrid * w22 + by, width, height);
+              const p2 = worldToScreen(i * w11 + maxGrid * w12 + bx, i * w21 + maxGrid * w22 + by, width, height);
+              ctx.strokeStyle = (i === 0) ? axisColor : lineColor;
+              ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+
+              // Lines parallel to column 1 (moving along column 2)
+              const p3 = worldToScreen(-maxGrid * w11 + i * w12 + bx, -maxGrid * w21 + i * w22 + by, width, height);
+              const p4 = worldToScreen(maxGrid * w11 + i * w12 + bx, maxGrid * w21 + i * w22 + by, width, height);
+              ctx.strokeStyle = (i === 0) ? axisColor : lineColor;
+              ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.stroke();
+          }
+          
+          if (drawNumbers && i !== 0) {
+              ctx.font = "10px monospace";
+              ctx.fillStyle = "#c026d3"; // fuchsia-600
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              
+              // Tick on c1 axis (along w_c1)
+              const tickC1 = worldToScreen(i * w11 + bx, i * w21 + by, width, height);
+              if (tickC1.x > -50 && tickC1.x < width + 50 && tickC1.y > -50 && tickC1.y < height + 50) {
+                  ctx.fillText(i, tickC1.x, tickC1.y + 12);
+              }
+              
+              // Tick on c2 axis (along w_c2)
+              const tickC2 = worldToScreen(i * w12 + bx, i * w22 + by, width, height);
+              if (tickC2.x > -50 && tickC2.x < width + 50 && tickC2.y > -50 && tickC2.y < height + 50) {
+                  ctx.fillText(i, tickC2.x - 12, tickC2.y);
+              }
+          }
+        }
+        ctx.restore();
+      }
+
+      // Push an input-space solution line { x : n·x = c } through x ↦ Wx + b and draw
+      // where it lands. For invertible W it lands exactly on that row's target line;
+      // when W is singular the whole line collapses onto a single output point.
+      function drawImageOfLine(ctx, width, height, nx, ny, c, color) {
+        const nsq = nx * nx + ny * ny;
+        if (nsq < 1e-9) return;
+        const px = nx * c / nsq, py = ny * c / nsq;   // foot of the line
+        const dx = -ny, dy = nx;                      // direction along it
+        const Wdx = w11 * dx + w12 * dy, Wdy = w21 * dx + w22 * dy;
+        const ix = w11 * px + w12 * py + b1, iy = w21 * px + w22 * py + b2;
+
+        ctx.save();
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.globalAlpha = 0.3;
+        const dmag = Math.hypot(Wdx, Wdy);
+        if (dmag < 1e-9) {
+          const p = worldToScreen(ix, iy, width, height);
+          ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, Math.PI * 2); ctx.fill();
+        } else {
+          const scale = Math.min(width, height) / (2 * currentWorldExtent);
+          const t = (Math.max(width, height) / scale + Math.hypot(panX, panY)) * 2 / dmag;
+          const p1 = worldToScreen(ix - Wdx * t, iy - Wdy * t, width, height);
+          const p2 = worldToScreen(ix + Wdx * t, iy + Wdy * t, width, height);
+          ctx.lineWidth = 5; ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function getEigenSystem(w11, w12, w21, w22) {
+          const T = w11 + w22;
+          const D = w11 * w22 - w12 * w21;
+          const delta = T * T - 4 * D;
+          
+          if (delta < -1e-6) return null; // Complex eigenvalues
+          
+          const sqrtDelta = Math.sqrt(Math.max(0, delta));
+          const l1 = (T + sqrtDelta) / 2;
+          const l2 = (T - sqrtDelta) / 2;
+          
+          function getEigenvector(lambda) {
+              if (Math.abs(w12) > 1e-6) {
+                  return { x: w12, y: lambda - w11 };
+              } else if (Math.abs(w21) > 1e-6) {
+                  return { x: lambda - w22, y: w21 };
+              } else {
+                  return (Math.abs(lambda - w11) < 1e-6) ? { x: 1, y: 0 } : { x: 0, y: 1 };
+              }
+          }
+          
+          const v1 = getEigenvector(l1);
+          const v2 = getEigenvector(l2);
+          
+          const mag1 = Math.sqrt(v1.x*v1.x + v1.y*v1.y);
+          const mag2 = Math.sqrt(v2.x*v2.x + v2.y*v2.y);
+          
+          // Fallback if magnitude is 0 (shouldn't happen with above logic but safe to check)
+          if (mag1 < 1e-6 || mag2 < 1e-6) return null;
+
+          return {
+              l1: l1,
+              v1: { x: v1.x / mag1, y: v1.y / mag1 },
+              l2: l2,
+              v2: { x: v2.x / mag2, y: v2.y / mag2 }
+          };
+      }
+
+      function drawEigenspace(ctx, vx, vy, color, width, height, scale) {
+          const maxDist = Math.max(width, height) / scale * 2 + Math.hypot(panX, panY);
+          const p1 = worldToScreen(-vx * maxDist, -vy * maxDist, width, height);
+          const p2 = worldToScreen(vx * maxDist, vy * maxDist, width, height);
+          
+          ctx.save();
+          ctx.beginPath();
+          ctx.strokeStyle = color;
+          ctx.setLineDash([5, 5]);
+          ctx.lineWidth = 1.5;
+          ctx.globalAlpha = 0.5;
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+          ctx.restore();
+      }
+
+      // --- Draw on Output Canvas ---
+      if (showWarpedGrid.checked || showWarpedNumbers.checked) {
+          drawWarpedGrid(ctxOut, w11, w12, w21, w22, b1, b2, widthOut, heightOut, showWarpedGrid.checked, showWarpedNumbers.checked);
+      }
+      
+      if (showUnitOut.checked) {
+          const p0 = worldToScreen(b1, b2, widthOut, heightOut);
+          const px = worldToScreen(w11 + b1, w21 + b2, widthOut, heightOut);
+          const pxy = worldToScreen(w11 + w12 + b1, w21 + w22 + b2, widthOut, heightOut);
+          const py = worldToScreen(w12 + b1, w22 + b2, widthOut, heightOut);
+          ctxOut.fillStyle = "rgba(217, 70, 239, 0.15)";
+          ctxOut.strokeStyle = "rgba(217, 70, 239, 0.4)";
+          ctxOut.lineWidth = 1;
+          ctxOut.beginPath();
+          ctxOut.moveTo(p0.x, p0.y); ctxOut.lineTo(px.x, px.y);
+          ctxOut.lineTo(pxy.x, pxy.y); ctxOut.lineTo(py.x, py.y);
+          ctxOut.closePath();
+          ctxOut.fill(); ctxOut.stroke();
+      }
+
+      if (showInputInOut.checked) {
+          const sxOut = worldToScreen(x1, x2, widthOut, heightOut);
+          ctxOut.save();
+          ctxOut.globalAlpha = 0.5; // Make it slightly transparent
+          drawArrow(ctxOut, originOut.x, originOut.y, sxOut.x, sxOut.y, "#34d399", 3, 14, false);
+          ctxOut.font = "bold 11px monospace";
+          drawLabel(ctxOut, widthOut, heightOut, "s", sxOut, "#34d399", 0, 20);
+          ctxOut.restore();
+      }
+
+      if (showBias.checked) {
+          const sb = worldToScreen(b1, b2, widthOut, heightOut);
+          drawArrow(ctxOut, originOut.x, originOut.y, sb.x, sb.y, BIAS, 3, 14, false);
+      }
+
+      if (showCols.checked) {
+          drawArrow(ctxOut, originOut.x, originOut.y, sw_c1.x, sw_c1.y, "#d946ef", 2.5, 12, true);
+          drawArrow(ctxOut, originOut.x, originOut.y, sw_c2.x, sw_c2.y, "#d946ef", 2.5, 12, true);
+      }
+      if (showOutput.checked) {
+          drawArrow(ctxOut, originOut.x, originOut.y, sy.x, sy.y, "#e879f9", 3, 14, false);
+      }
+      
+      if (showHyperplanesOut.checked) {
+          // The solution lines as they are in the INPUT space, ghosted onto the original
+          // (unwarped) grid — the "before" that the bands below are the "after" of.
+          ctxOut.save();
+          ctxOut.globalAlpha = 0.35;
+          drawLineEquation(ctxOut, w11, w12, t1 - b1, R1, widthOut, heightOut);
+          if (!single) drawLineEquation(ctxOut, w21, w22, t2 - b2, R2, widthOut, heightOut);
+          if (solution) drawPoint(ctxOut, widthOut, heightOut, originOut, solution.x, solution.y, TARGET, "x*", false);
+          ctxOut.restore();
+
+          // Where each input-space solution line actually lands, under its target line.
+          drawImageOfLine(ctxOut, widthOut, heightOut, w11, w12, t1 - b1, R1);
+          if (!single) drawImageOfLine(ctxOut, widthOut, heightOut, w21, w22, t2 - b2, R2);
+
+          drawLineEquation(ctxOut, 1, 0, t1, R1, widthOut, heightOut);
+          if (!single) drawLineEquation(ctxOut, 0, 1, t2, R2, widthOut, heightOut);
+          // i* read on the WARPED grid: its coordinates there are exactly x*, because
+          // i* = b + x*₁·c1 + x*₂·c2. Walk that staircase so the target is tied to the
+          // warped lattice, not just to the original grid's i₁/i₂ lines.
+          if (solution) {
+              const pB   = worldToScreen(b1, b2, widthOut, heightOut);
+              const pMid = worldToScreen(b1 + solution.x * w11, b2 + solution.x * w21, widthOut, heightOut);
+              const pEnd = worldToScreen(t1, t2, widthOut, heightOut);
+              ctxOut.save();
+              ctxOut.strokeStyle = TARGET; ctxOut.globalAlpha = 0.6;
+              ctxOut.lineWidth = 2; ctxOut.setLineDash([5, 4]);
+              ctxOut.beginPath();
+              ctxOut.moveTo(pB.x, pB.y); ctxOut.lineTo(pMid.x, pMid.y); ctxOut.lineTo(pEnd.x, pEnd.y);
+              ctxOut.stroke();
+              ctxOut.setLineDash([]);
+              ctxOut.font = "bold 10px monospace";
+              drawLabel(ctxOut, widthOut, heightOut, `${solution.x.toFixed(1)}·c1`,
+                        { x: (pB.x + pMid.x) / 2, y: (pB.y + pMid.y) / 2 }, TARGET, 0, -8);
+              drawLabel(ctxOut, widthOut, heightOut, `${solution.y.toFixed(1)}·c2`,
+                        { x: (pMid.x + pEnd.x) / 2, y: (pMid.y + pEnd.y) / 2 }, TARGET, 18, 0);
+              ctxOut.restore();
+          }
+
+          drawPoint(ctxOut, widthOut, heightOut, originOut, t1, t2, TARGET, "i*", false);
+      }
+
+      ctxOut.font = "bold 11px monospace";
+      if (showBias.checked) {
+          const sb = worldToScreen(b1, b2, widthOut, heightOut);
+          drawLabel(ctxOut, widthOut, heightOut, "b", sb, BIAS, 0, -15);
+      }
+      if (showCols.checked) {
+          drawLabel(ctxOut, widthOut, heightOut, "c1", sw_c1, "#d946ef", 15, 15);
+          drawLabel(ctxOut, widthOut, heightOut, "c2", sw_c2, "#d946ef", -15, 15);
+      }
+      if (showOutput.checked) {
+          drawLabel(ctxOut, widthOut, heightOut, "i", sy, "#e879f9", 0, -15);
+      }
+
+      if (eigen && showEigen.checked) {
+          // Output Space: Draw scaled eigenvectors
+          drawEigenspace(ctxOut, eigen.v1.x, eigen.v1.y, "#f43f5e", widthOut, heightOut, scaleOut);
+          const scaledV1 = worldToScreen(eigen.v1.x * eigen.l1, eigen.v1.y * eigen.l1, widthOut, heightOut);
+          drawArrow(ctxOut, originOut.x, originOut.y, scaledV1.x, scaledV1.y, "#f43f5e", 3, 12, false);
+          ctxOut.fillStyle = "#f43f5e"; ctxOut.fillText(`λ₁v₁`, scaledV1.x + 10, scaledV1.y);
+
+          drawEigenspace(ctxOut, eigen.v2.x, eigen.v2.y, "#f43f5e", widthOut, heightOut, scaleOut);
+          const scaledV2 = worldToScreen(eigen.v2.x * eigen.l2, eigen.v2.y * eigen.l2, widthOut, heightOut);
+          drawArrow(ctxOut, originOut.x, originOut.y, scaledV2.x, scaledV2.y, "#f43f5e", 3, 12, false);
+          ctxOut.fillStyle = "#f43f5e"; ctxOut.fillText(`λ₂v₂`, scaledV2.x + 10, scaledV2.y);
+      }
+
+      ctxIn.restore();
+      ctxOut.restore();
+      
+      updateMathSections(w11, w12, w21, w22, eigen);
+    }
+    
+    function updateMathSections(w11, w12, w21, w22, eigen) {
+        if (typeof katex === 'undefined') return; // Wait for katex to load
+
+        if (oneRow.checked) {
+            document.getElementById('math-determinant').innerHTML =
+              '<p class="text-sm font-sans text-slate-400 leading-relaxed">A 1×2 matrix has no determinant and no inverse. W flattens the plane onto a line, and that cannot be undone: every x on the solution line produces the same output.</p>';
+            document.getElementById('math-eigen').innerHTML =
+              '<p class="text-sm font-sans text-slate-400 leading-relaxed">Eigenvalues require a square matrix — W maps R² → R¹, so input and output do not live in the same space and no vector can be "scaled in place".</p>';
+            return;
+        }
+
+        // Determinant Math
+        const det = w11*w22 - w12*w21;
+        const detMath = `
+            \\begin{aligned}
+            A &= \\begin{pmatrix} ${w11} & ${w12} \\\\ ${w21} & ${w22} \\end{pmatrix} \\\\[1em]
+            \\det(A) &= (c_1)_x(c_2)_y - (c_1)_y(c_2)_x \\\\[0.5em]
+            \\det(A) &= (${w11})(${w22}) - (${w12})(${w21}) \\\\[0.5em]
+            \\det(A) &= ${det.toFixed(2)}
+            \\end{aligned}
+        `;
+        katex.render(detMath, document.getElementById('math-determinant'), { displayMode: true, throwOnError: false });
+
+        // Eigen Math
+        const T = w11 + w22;
+        let eigenMath = `
+            \\begin{aligned}
+            \\text{Trace } (T) &= a + d = ${w11} + ${w22} = ${T.toFixed(2)} \\\\[0.5em]
+            \\text{Det } (D) &= ${det.toFixed(2)} \\\\[1em]
+            \\text{Char. Eq: } &\\lambda^2 - T\\lambda + D = 0 \\\\[0.5em]
+            &\\lambda^2 - (${T.toFixed(2)})\\lambda + (${det.toFixed(2)}) = 0 \\\\[1em]
+            \\lambda &= \\frac{${T.toFixed(2)} \\pm \\sqrt{(${T.toFixed(2)})^2 - 4(${det.toFixed(2)})}}{2} \\\\[0.5em]
+        `;
+        
+        const delta = T*T - 4*det;
+        eigenMath += `\\Delta &= ${delta.toFixed(2)} \\\\[1em]`;
+        
+        if (eigen) {
+            eigenMath += `
+                \\lambda_1 &= ${eigen.l1.toFixed(3)}, \\quad v_1 = \\begin{pmatrix} ${eigen.v1.x.toFixed(3)} \\\\ ${eigen.v1.y.toFixed(3)} \\end{pmatrix} \\\\[1em]
+                \\lambda_2 &= ${eigen.l2.toFixed(3)}, \\quad v_2 = \\begin{pmatrix} ${eigen.v2.x.toFixed(3)} \\\\ ${eigen.v2.y.toFixed(3)} \\end{pmatrix}
+                \\end{aligned}
+            `;
+        } else {
+            eigenMath += `
+                \\end{aligned} \\\\[1em]
+                \\text{Since } \\Delta < 0 \\text{, the eigenvalues are complex.} \\\\
+                \\text{The matrix represents a rotation and scaling, without any real invariant directions.}
+            `;
+        }
+        
+        katex.render(eigenMath, document.getElementById('math-eigen'), { displayMode: true, throwOnError: false });
+    }
+
+    // Attempt to render math once katex loads
+    window.addEventListener('load', () => {
+        setTimeout(render, 100);
+    });
+
+    window.addEventListener('DOMContentLoaded', resizeCanvas);
+    resizeCanvas();
+  </script>
+</body>
+</html>
